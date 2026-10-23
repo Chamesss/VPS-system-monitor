@@ -23,6 +23,13 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 $tag = "v$Version"
 
+# git prints progress on stderr; don't let Windows PowerShell treat that as a failure.
+function Invoke-Git {
+    $ErrorActionPreference = "Continue"
+    & git @args 2>&1 | ForEach-Object { "$_" }
+    if ($LASTEXITCODE) { throw "git $args failed (exit $LASTEXITCODE)" }
+}
+
 if (git status --porcelain) { throw "Working tree has uncommitted changes - commit or stash them first." }
 if (git tag -l $tag) { throw "Tag $tag already exists." }
 if ($Local -and -not (Get-Command gh -ErrorAction SilentlyContinue)) { throw "-Local needs the GitHub CLI: winget install GitHub.cli" }
@@ -35,12 +42,12 @@ $text = [IO.File]::ReadAllText("$PSScriptRoot\$proj")
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
 if (git status --porcelain) {
-    git add $proj
-    git commit -m "Release $tag"
+    Invoke-Git add $proj
+    Invoke-Git commit -m "Release $tag"
 }
-git tag -a $tag -m "VPS Monitor $tag"
-git push origin HEAD
-git push origin $tag
+Invoke-Git tag -a $tag -m "VPS Monitor $tag"
+Invoke-Git push origin HEAD
+Invoke-Git push origin $tag
 
 if ($Local) {
     gh release create $tag dist\VPSMonitor.exe dist\VPSMonitor.exe.sha256 --title "VPS Monitor $tag" --generate-notes
