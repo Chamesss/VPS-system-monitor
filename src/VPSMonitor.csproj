@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>VPSMonitor</AssemblyName>
+    <RootNamespace>VpsMonitor</RootNamespace>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <Version>1.0.0</Version>
+    <Product>VPS Monitor</Product>
+    <Description>Live system monitor for Linux servers over SSH</Description>
+    <Copyright>Copyright (c) 2026 chams. MIT License.</Copyright>
+    <Company>chams</Company>
+    <RepositoryUrl>https://github.com/Chamesss/VPS-system-monitor</RepositoryUrl>
+    <DebugType>none</DebugType>
+    <GenerateResourceUsePreserializedResources>false</GenerateResourceUsePreserializedResources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Security" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ui.html" LogicalName="ui.html" />
+    <EmbeddedResource Include="remote.sh" LogicalName="remote.sh" />
+  </ItemGroup>
+
+</Project>

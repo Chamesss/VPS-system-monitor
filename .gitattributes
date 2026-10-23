@@ -1,0 +1,5 @@
+* text=auto
+# Runs on Linux servers: must keep LF line endings.
+*.sh text eol=lf
+*.png binary
+*.ico binary

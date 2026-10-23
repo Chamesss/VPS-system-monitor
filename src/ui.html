@@ -1,0 +1,1377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VPS Monitor</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232a78d6'/%3E%3Cpath d='M10 36h10l6-14 9 26 7-18 4 6h8' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f3f3f1;
+  --surface-1: #fcfcfb;
+  --surface-2: #f0efec;
+  --border: #e3e2dd;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #77766f;
+  --grid: #ebeae6;
+  --axis: #a9a8a2;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --accent: #2a78d6;
+  --accent-ink: #ffffff;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 1px 1px rgba(0,0,0,.03);
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121211;
+    --surface-1: #1a1a19;
+    --surface-2: #232321;
+    --border: #2e2e2b;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --grid: #2a2a27;
+    --axis: #5b5a55;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --accent: #3987e5;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211;
+  --surface-1: #1a1a19;
+  --surface-2: #232321;
+  --border: #2e2e2b;
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --grid: #2a2a27;
+  --axis: #5b5a55;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --accent: #3987e5;
+  --shadow: none;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--text-primary);
+  font: 14px/1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+[hidden] { display: none !important; }
+button, input, select { font: inherit; color: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---- top bar ---- */
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 16px;
+  height: 52px; padding: 0 20px;
+  background: var(--surface-1); border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; white-space: nowrap; }
+.brand svg { width: 24px; height: 24px; }
+.top-mid { flex: 1; min-width: 0; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.top-mid b { color: var(--text-primary); font-weight: 600; }
+.top-actions { display: flex; align-items: center; gap: 8px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 34px; padding: 0 14px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface-1);
+  cursor: pointer; white-space: nowrap;
+}
+.btn:hover { background: var(--surface-2); }
+.btn:focus-visible, input:focus-visible, .seg button:focus-visible, th button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--critical); }
+.btn.small { height: 28px; padding: 0 10px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.icon-btn { width: 34px; padding: 0; }
+
+.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 99px; background: var(--surface-2); color: var(--text-secondary); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex: none; }
+.dot.good { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+.dot.warning { background: var(--warning); }
+.dot.critical { background: var(--critical); }
+
+main { padding: 20px; max-width: 1600px; margin: 0 auto; }
+.view { animation: fade .18s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+.card-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px 0; }
+.card-h h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--text-secondary); letter-spacing: .02em; text-transform: uppercase; }
+.card-b { padding: 12px 16px 16px; }
+.muted { color: var(--text-muted); }
+.hint { color: var(--text-muted); font-size: 13px; margin: 0; }
+
+/* ---- boot / setup ---- */
+.center { min-height: calc(100vh - 92px); display: grid; place-items: center; }
+.spinner { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.setup { width: min(680px, 100%); padding: 28px; }
+.setup h1 { margin: 0 0 6px; font-size: 22px; }
+.tools { list-style: none; margin: 18px 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; }
+.tools li { display: flex; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--border); }
+.tools li:first-child { border-top: 0; }
+.tools .ic { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; flex: none; color: #fff; }
+.tools .ic.ok { background: var(--good); }
+.tools .ic.bad { background: var(--critical); }
+.tools .ic.opt { background: var(--warning); color: #000; }
+.tools .t-name { font-weight: 600; }
+.tools .t-sub { font-size: 12.5px; color: var(--text-muted); word-break: break-all; }
+.tools .t-note { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+.steps { margin: 8px 0 20px; padding-left: 20px; }
+.steps li { margin: 10px 0; }
+.code { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.code code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font: 12.5px var(--mono); background: var(--surface-2); border: 1px solid var(--border); padding: 7px 10px; border-radius: 6px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ---- home ---- */
+.home { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); gap: 20px; align-items: start; }
+.sessions { list-style: none; margin: 0; padding: 0; }
+.sess { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-top: 1px solid var(--border); }
+.sess:first-child { border-top: 0; }
+.sess-ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); color: var(--accent); flex: none; }
+.sess-main { flex: 1; min-width: 0; }
+.sess-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-sub { font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-actions { display: flex; gap: 6px; }
+.empty { padding: 36px 16px; text-align: center; color: var(--text-muted); }
+
+form label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; }
+form input[type=text], form input[type=password], form input[type=number], .modal input[type=password] {
+  display: block; width: 100%; height: 36px; margin-top: 5px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-weight: 400;
+}
+.grid2 { display: grid; grid-template-columns: 1fr 96px; gap: 10px; }
+.inline { display: flex; gap: 8px; margin-top: 5px; }
+.inline input { margin-top: 0 !important; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+fieldset:disabled { opacity: .55; }
+.seg { display: flex; padding: 3px; gap: 3px; background: var(--surface-2); border-radius: 9px; margin: 6px 0 14px; }
+.seg button { flex: 1; height: 30px; border: 0; border-radius: 7px; background: transparent; cursor: pointer; font-size: 13px; color: var(--text-secondary); }
+.seg button[aria-pressed="true"] { background: var(--surface-1); color: var(--text-primary); font-weight: 600; box-shadow: var(--shadow); }
+label.check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; color: var(--text-secondary); }
+label.check input { margin-top: 3px; }
+.error { background: color-mix(in srgb, var(--critical) 10%, transparent); border: 1px solid color-mix(in srgb, var(--critical) 35%, transparent); color: var(--text-primary); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 13px; }
+.error::before { content: "⚠ "; color: var(--critical); font-weight: 700; }
+.error details { margin-top: 6px; color: var(--text-muted); }
+.error pre { white-space: pre-wrap; font: 12px var(--mono); margin: 6px 0 0; }
+.toolchips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+/* ---- dashboard ---- */
+.dash-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.dash-bar .host { font-size: 20px; font-weight: 650; }
+.dash-bar .spacer { flex: 1; }
+.seg.range { margin: 0; width: auto; }
+.seg.range button { flex: none; padding: 0 12px; }
+.banner { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; border: 1px solid color-mix(in srgb, var(--warning) 50%, transparent); background: color-mix(in srgb, var(--warning) 12%, transparent); }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi { padding: 14px 16px; min-height: 108px; display: flex; flex-direction: column; }
+.kpi .k-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; display: flex; justify-content: space-between; gap: 8px; }
+.kpi .k-value { font-size: 24px; font-weight: 650; margin-top: 4px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi .k-value small { font-size: 14px; font-weight: 500; color: var(--text-secondary); }
+.kpi .k-sub { font-size: 12.5px; color: var(--text-secondary); margin-top: auto; padding-top: 6px; }
+.meter { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+.meter i { display: block; height: 100%; background: var(--series-1); border-radius: 3px; transition: width .4s ease; }
+.meter i.warning { background: var(--warning); }
+.meter i.critical { background: var(--critical); }
+.status { font-size: 11px; font-weight: 700; text-transform: none; letter-spacing: 0; display: inline-flex; align-items: center; gap: 4px; }
+.status.warning { color: var(--text-primary); }
+.status.warning::before { content: "▲"; color: var(--warning); }
+.status.critical { color: var(--text-primary); }
+.status.critical::before { content: "●"; color: var(--critical); }
+
+.grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+.span-3 { grid-column: span 3; } .span-4 { grid-column: span 4; } .span-5 { grid-column: span 5; } .span-6 { grid-column: span 6; }
+.span-7 { grid-column: span 7; } .span-8 { grid-column: span 8; } .span-12 { grid-column: span 12; }
+
+.tchart .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px; }
+.tchart .lg { display: inline-flex; align-items: center; gap: 6px; }
+.tchart .lg b { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+.plot { position: relative; height: 210px; }
+.plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+.tip {
+  position: absolute; top: 6px; pointer-events: none; z-index: 5;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.14); padding: 8px 10px; font-size: 12px; min-width: 150px;
+}
+.tip .tt { color: var(--text-muted); margin-bottom: 4px; }
+.tip .tr { display: flex; align-items: center; gap: 6px; }
+.tip .tr span { flex: 1; color: var(--text-secondary); }
+.tip .tr b { font-variant-numeric: tabular-nums; font-weight: 600; }
+.tip .tr.total { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; }
+
+.cores { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 16px; }
+.core { font-size: 12.5px; }
+.core .top { display: flex; justify-content: space-between; color: var(--text-secondary); }
+.core .top b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.core .meter { margin-top: 4px; }
+
+.mounts { display: flex; flex-direction: column; gap: 14px; }
+.mount .top { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.mount .top span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mount .sub { font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; gap: 8px; margin-top: 3px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { font-size: 12px; color: var(--text-muted); font-weight: 600; position: sticky; top: 0; background: var(--surface-1); z-index: 1; }
+th button { all: unset; cursor: pointer; }
+th button[aria-sort]::after { content: " ▾"; }
+th button[aria-sort="ascending"]::after { content: " ▴"; }
+td.r, th.r { text-align: right; }
+td.cmd { max-width: 1px; width: 40%; overflow: hidden; text-overflow: ellipsis; color: var(--text-secondary); font: 12px var(--mono); }
+tbody tr:hover { background: var(--surface-2); }
+.tablewrap { max-height: 460px; overflow: auto; border-top: 1px solid var(--border); }
+.search { height: 30px; border: 1px solid var(--border); border-radius: 7px; padding: 0 10px; background: var(--bg); width: 220px; }
+.virt td { color: var(--text-muted); }
+.pill { display: inline-block; font: 600 11px var(--font); padding: 1px 7px; border-radius: 99px; background: var(--surface-2); color: var(--text-secondary); }
+.list { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.list li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.list li:last-child { border-bottom: 0; }
+.ok-line { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; }
+
+/* ---- overlays ---- */
+.overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(0,0,0,.35); backdrop-filter: blur(2px); padding: 16px; }
+.modal { width: min(420px, 100%); padding: 22px; }
+.modal h3 { margin: 0 0 4px; }
+.busy-box { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 30px; width: min(380px, 100%); text-align: center; }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 60; background: var(--text-primary); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 13px; }
+
+@media (max-width: 1100px) {
+  .span-3, .span-4, .span-5, .span-6, .span-7, .span-8 { grid-column: span 12; }
+  .home { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  main { padding: 16px; }
+  .top-mid { display: none; }
+  .search { width: 140px; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--accent)"/><path d="M10 36h10l6-14 9 26 7-18 4 6h8" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    VPS Monitor
+  </div>
+  <div class="top-mid" id="topInfo"></div>
+  <div class="top-actions">
+    <span id="liveBadge" class="badge" hidden><i class="dot"></i><span></span></span>
+    <button id="disconnectBtn" class="btn small" hidden>Disconnect</button>
+    <button id="themeBtn" class="btn icon-btn small" title="Theme: system" aria-label="Toggle theme">◐</button>
+  </div>
+</header>
+
+<main>
+  <!-- boot -->
+  <section id="view-boot" class="view center">
+    <div style="display:grid;place-items:center;gap:14px"><div class="spinner"></div><div class="muted">Checking requirements…</div></div>
+  </section>
+
+  <!-- missing tools -->
+  <section id="view-setup" class="view center" hidden>
+    <div class="card setup">
+      <h1>One more step</h1>
+      <p class="muted" style="margin:0">VPS Monitor needs the tools below on this PC before you can add a server.</p>
+      <ul class="tools" id="setupTools"></ul>
+      <div id="sshHelp">
+        <h3 style="margin:0 0 4px;font-size:15px">Install the OpenSSH Client (pick one)</h3>
+        <ol class="steps">
+          <li><b>Windows Settings</b> → System → Optional features → <i>View features</i> → search “OpenSSH Client” → Install.
+            <div class="row" style="margin-top:6px"><button class="btn small" id="openFeaturesBtn">Open Optional features</button></div></li>
+          <li>Or in <b>PowerShell as Administrator</b>:
+            <div class="code"><code>Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0</code><button class="btn small" data-copy>Copy</button></div></li>
+          <li>Or with winget:
+            <div class="code"><code>winget install Microsoft.OpenSSH.Preview</code><button class="btn small" data-copy>Copy</button></div></li>
+        </ol>
+        <p class="hint">After installing, close VPS Monitor and open it again.</p>
+      </div>
+      <div class="row" style="margin-top:18px;justify-content:flex-end">
+        <button class="btn" id="recheckBtn">Check again</button>
+        <button class="btn primary" id="quitBtn">Close VPS Monitor</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- sessions + new connection -->
+  <section id="view-home" class="view" hidden>
+    <div class="home">
+      <div class="card">
+        <div class="card-h"><h2>Saved servers</h2><span class="muted num" id="sessCount"></span></div>
+        <div class="card-b" style="padding:8px 0 4px">
+          <ul class="sessions" id="sessions"></ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h2 id="formTitle">Add a server</h2><button type="button" class="btn small" id="formReset" hidden>New</button></div>
+        <div class="card-b">
+          <form id="connForm" autocomplete="off" novalidate>
+            <fieldset id="connFields" disabled>
+              <label>Name <span class="muted">(optional)</span><input type="text" name="name" placeholder="Production VPS"></label>
+              <div class="grid2">
+                <label>Host or IP<input type="text" name="host" placeholder="203.0.113.10" spellcheck="false"></label>
+                <label>Port<input type="number" name="port" value="22" min="1" max="65535"></label>
+              </div>
+              <label>Username<input type="text" name="user" placeholder="root" spellcheck="false"></label>
+
+              <div style="font-size:12.5px;font-weight:600;color:var(--text-secondary)">Authentication</div>
+              <div class="seg" id="authSeg">
+                <button type="button" data-auth="password" aria-pressed="true">Password</button>
+                <button type="button" data-auth="key" aria-pressed="false">Private key</button>
+                <button type="button" data-auth="agent" aria-pressed="false">Agent / config</button>
+              </div>
+
+              <div data-for="password">
+                <label>Password<input type="password" name="password"></label>
+              </div>
+              <div data-for="key" hidden>
+                <label>Private key file
+                  <div class="inline"><input type="text" name="keyPath" placeholder="C:\Users\you\.ssh\id_ed25519" spellcheck="false"><button type="button" class="btn" id="browseBtn">Browse…</button></div>
+                </label>
+                <label>Key passphrase <span class="muted">(if the key has one)</span><input type="password" name="passphrase"></label>
+              </div>
+              <div data-for="agent" hidden>
+                <p class="hint" style="margin-bottom:12px">Uses the Windows ssh-agent, your default keys (~/.ssh/id_*) and ~/.ssh/config — so a Host alias from your config works in the Host field.</p>
+              </div>
+
+              <label class="check" id="rememberRow"><input type="checkbox" name="remember" checked> Remember the password / passphrase on this PC (encrypted with your Windows account)</label>
+              <div id="formError" class="error" hidden></div>
+              <button class="btn primary" type="submit" style="width:100%;height:38px">Connect</button>
+            </fieldset>
+          </form>
+          <div class="toolchips" id="toolChips"></div>
+          <p class="hint" style="margin-top:12px">No server handy? <a href="#" data-demo style="color:var(--accent)">Open the demo dashboard</a> with simulated data.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- dashboard -->
+  <section id="view-dash" class="view" hidden>
+    <div id="reconnectBanner" class="banner" hidden><div class="spinner" style="width:16px;height:16px;border-width:2px"></div><span></span></div>
+
+    <div class="dash-bar">
+      <div>
+        <div class="host" id="dHost">—</div>
+        <div class="muted" id="dSub" style="font-size:13px"></div>
+      </div>
+      <div class="spacer"></div>
+      <span class="muted" style="font-size:12.5px">History</span>
+      <div class="seg range" id="rangeSeg">
+        <button type="button" data-range="60" aria-pressed="false">1 min</button>
+        <button type="button" data-range="300" aria-pressed="true">5 min</button>
+        <button type="button" data-range="900" aria-pressed="false">15 min</button>
+      </div>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="grid">
+      <div class="card span-8"><div class="card-h"><h2>CPU usage</h2><span class="muted num" id="cpuNow"></span></div><div class="card-b"><div id="cpuChart"></div></div></div>
+      <div class="card span-4"><div class="card-h"><h2>Per core</h2><span class="muted" id="coreCount"></span></div><div class="card-b"><div class="cores" id="cores"></div>
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 4px">Top CPU consumers</div>
+        <ul class="list" id="topProcs"></ul></div></div>
+    </div>
+    <div class="grid">
+      <div class="card span-6"><div class="card-h"><h2>Memory</h2><span class="muted num" id="memNow"></span></div><div class="card-b"><div id="memChart"></div></div></div>
+      <div class="card span-6"><div class="card-h"><h2>Network throughput</h2><span class="muted" style="font-size:12px">all non-virtual interfaces</span></div><div class="card-b"><div id="netChart"></div></div></div>
+    </div>
+    <div class="grid">
+      <div class="card span-7"><div class="card-h"><h2>Disk I/O</h2><span class="muted num" id="diskBusy"></span></div><div class="card-b"><div id="diskChart"></div></div></div>
+      <div class="card span-5"><div class="card-h"><h2>Storage</h2></div><div class="card-b"><div class="mounts" id="mounts"><span class="muted">Waiting for data…</span></div></div></div>
+    </div>
+    <div class="grid">
+      <div class="card span-12">
+        <div class="card-h"><h2>Processes</h2>
+          <div class="row" style="align-items:center"><span class="muted num" id="procSummary" style="font-size:12.5px"></span><input class="search" id="procSearch" type="search" placeholder="Filter by name, user, command"></div>
+        </div>
+        <div class="card-b" style="padding:10px 0 0">
+          <div class="tablewrap">
+            <table id="procTable">
+              <thead><tr>
+                <th class="r"><button data-sort="pid">PID</button></th>
+                <th><button data-sort="name">Name</button></th>
+                <th><button data-sort="user">User</button></th>
+                <th class="r"><button data-sort="cpu" aria-sort="descending">CPU</button></th>
+                <th class="r"><button data-sort="rss">Memory</button></th>
+                <th class="r"><button data-sort="threads">Threads</button></th>
+                <th><button data-sort="state">State</button></th>
+                <th>Command</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="card span-5"><div class="card-h"><h2>Network interfaces</h2></div><div class="card-b" style="padding:8px 0 4px">
+        <table id="ifTable"><thead><tr><th>Interface</th><th class="r">Down</th><th class="r">Up</th><th class="r">Received</th><th class="r">Sent</th></tr></thead><tbody></tbody></table>
+      </div></div>
+      <div class="card span-4"><div class="card-h"><h2>Listening ports</h2><span class="muted num" id="portCount"></span></div><div class="card-b"><ul class="list" id="ports"><li class="muted">Waiting for data…</li></ul></div></div>
+      <div class="card span-3"><div class="card-h"><h2>Services</h2></div><div class="card-b" id="services"><span class="muted">Waiting for data…</span></div></div>
+    </div>
+  </section>
+</main>
+
+<div class="overlay" id="busy" hidden>
+  <div class="card busy-box"><div class="spinner"></div><div id="busyText">Connecting…</div><button class="btn small" id="busyCancel">Cancel</button></div>
+</div>
+
+<div class="overlay" id="modal" hidden>
+  <form class="card modal" id="modalForm">
+    <h3 id="modalTitle"></h3>
+    <p class="muted" id="modalText" style="margin:0 0 14px"></p>
+    <div id="modalBody"></div>
+    <div class="row" style="justify-content:flex-end;margin-top:16px">
+      <button type="button" class="btn" id="modalCancel">Cancel</button>
+      <button type="submit" class="btn primary" id="modalOk">OK</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("vpsmon." + k); return v == null ? d : v; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("vpsmon." + k, v); } catch {} },
+};
+
+const TOKEN = (() => {
+  const q = new URLSearchParams(location.search).get("t");
+  try { if (q) sessionStorage.setItem("vpsmon.t", q); return q || sessionStorage.getItem("vpsmon.t") || ""; } catch { return q || ""; }
+})();
+
+async function api(path, body) {
+  try {
+    const r = await fetch("/api/" + path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: { "X-Token": TOKEN, "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return await r.json();
+  } catch (e) {
+    return { ok: false, error: "The VPS Monitor app is not responding. Close this window and start it again." };
+  }
+}
+
+/* ---------- formatting ---------- */
+const UNITS = ["B", "KB", "MB", "GB", "TB", "PB"];
+function fmtBytes(b, digits) {
+  if (!isFinite(b)) return "–";
+  let i = 0; b = Math.max(0, b);
+  while (b >= 1024 && i < UNITS.length - 1) { b /= 1024; i++; }
+  const d = digits ?? (b >= 100 || i === 0 ? 0 : b >= 10 ? 1 : 2);
+  return b.toFixed(d) + " " + UNITS[i];
+}
+const fmtRate = b => fmtBytes(b) + "/s";
+const fmtPct = (v, d = 0) => isFinite(v) ? v.toFixed(d) + "%" : "–";
+function fmtDuration(sec) {
+  sec = Math.floor(sec);
+  const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${m}m`;
+  return `${m}m ${sec % 60}s`;
+}
+function ago(ms) {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return s <= 1 ? "now" : s + "s ago";
+  return Math.floor(s / 60) + "m " + (s % 60) + "s ago";
+}
+function relDate(iso) {
+  if (!iso) return "never";
+  const s = (Date.now() - Date.parse(iso)) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + " min ago";
+  if (s < 86400) return Math.floor(s / 3600) + " h ago";
+  return new Date(iso).toLocaleDateString();
+}
+function level(pct, warn = 80, crit = 90) { return pct >= crit ? "critical" : pct >= warn ? "warning" : ""; }
+function statusTag(lv, labels = { warning: "High", critical: "Critical" }) {
+  return lv ? `<span class="status ${lv}">${labels[lv]}</span>` : "";
+}
+
+/* ---------- theme ---------- */
+const THEMES = ["system", "light", "dark"];
+function applyTheme(t) {
+  if (t === "system") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", t);
+  $("#themeBtn").title = "Theme: " + t;
+  store.set("theme", t);
+  redrawCharts();
+}
+$("#themeBtn").onclick = () => {
+  const cur = store.get("theme", "system");
+  applyTheme(THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length]);
+};
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => redrawCharts());
+
+/* ---------- views & overlays ---------- */
+function show(name) {
+  for (const v of $$(".view")) v.hidden = v.id !== "view-" + name;
+  const dash = name === "dash";
+  $("#disconnectBtn").hidden = !dash;
+  $("#liveBadge").hidden = !dash;
+  if (!dash) $("#topInfo").textContent = "";
+  if (dash) requestAnimationFrame(redrawCharts);
+}
+function busy(text) {
+  $("#busy").hidden = !text;
+  if (text) $("#busyText").textContent = text;
+}
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2600);
+}
+function modal({ title, text = "", body = "", ok = "OK", danger = false }) {
+  return new Promise(resolve => {
+    $("#modalTitle").textContent = title;
+    $("#modalText").textContent = text;
+    $("#modalBody").innerHTML = body;
+    $("#modalOk").textContent = ok;
+    $("#modalOk").className = "btn " + (danger ? "danger" : "primary");
+    $("#modal").hidden = false;
+    const first = $("#modalBody input"); (first || $("#modalOk")).focus();
+    const done = v => { $("#modal").hidden = true; $("#modalForm").onsubmit = $("#modalCancel").onclick = null; resolve(v); };
+    $("#modalForm").onsubmit = e => {
+      e.preventDefault();
+      const data = {};
+      for (const i of $$("input", $("#modalBody"))) data[i.name] = i.type === "checkbox" ? i.checked : i.value;
+      done(data);
+    };
+    $("#modalCancel").onclick = () => done(null);
+  });
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#modal").hidden) $("#modalCancel").click(); });
+
+/* ---------- requirements ---------- */
+let env = null;
+function renderTools(e) {
+  const rows = e.tools.map(t => {
+    const ic = t.Found ? `<span class="ic ok">✓</span>` : t.Required ? `<span class="ic bad">✕</span>` : `<span class="ic opt">!</span>`;
+    const sub = t.Found ? esc(t.Version ? t.Version + " · " + t.Path : t.Path) : t.Required ? "Required — not found" : "Optional — not found";
+    return `<li>${ic}<div><div class="t-name">${esc(t.Name)}</div><div class="t-sub">${sub}</div>${t.Note ? `<div class="t-note">${esc(t.Note)}</div>` : ""}</div></li>`;
+  });
+  $("#setupTools").innerHTML = rows.join("");
+  $("#sshHelp").hidden = e.tools.find(t => t.Id === "ssh").Found;
+  $("#toolChips").innerHTML = e.tools.filter(t => t.Found).map(t =>
+    `<span class="badge" title="${esc(t.Path)}"><i class="dot good"></i>${esc(t.Id === "ssh" ? (t.Version || "OpenSSH").split(",")[0] : "App window")}</span>`).join("")
+    + (e.version ? `<span class="badge">VPS Monitor v${esc(e.version)}</span>` : "");
+}
+$("#openFeaturesBtn").onclick = () => api("open-features", {});
+$("#quitBtn").onclick = async () => { await api("quit", {}); window.close(); };
+$("#recheckBtn").onclick = () => checkEnv();
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-copy]"); if (!b) return;
+  try { await navigator.clipboard.writeText(b.previousElementSibling.textContent); toast("Copied"); } catch { toast("Select the text and press Ctrl+C"); }
+});
+
+async function checkEnv() {
+  env = await api("env");
+  if (!env || !env.tools) { show("setup"); $("#setupTools").innerHTML = `<li>${esc(env?.error || "Could not check requirements.")}</li>`; return false; }
+  renderTools(env);
+  if (!env.ok) { show("setup"); return false; }
+  $("#connFields").disabled = false;
+  return true;
+}
+
+/* ---------- sessions ---------- */
+let sessions = [];
+const AUTH_LABEL = { password: "Password", key: "Private key", agent: "Agent / config" };
+async function loadSessions() {
+  const r = await api("sessions");
+  sessions = Array.isArray(r) ? r : [];
+  $("#sessCount").textContent = sessions.length ? sessions.length + " saved" : "";
+  $("#sessions").innerHTML = sessions.length ? sessions.map(s => `
+    <li class="sess" data-id="${esc(s.id)}">
+      <div class="sess-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg></div>
+      <div class="sess-main">
+        <div class="sess-name">${esc(s.name)}</div>
+        <div class="sess-sub">${esc(s.target)}${s.port !== 22 ? ":" + s.port : ""} · ${AUTH_LABEL[s.auth] || s.auth}${s.hasSecret ? " · saved" : ""} · used ${esc(relDate(s.lastUsed))}</div>
+      </div>
+      <div class="sess-actions">
+        <button class="btn small" data-act="edit" title="Edit">Edit</button>
+        <button class="btn small danger" data-act="delete" title="Forget this server">Delete</button>
+        <button class="btn small primary" data-act="connect">Connect</button>
+      </div>
+    </li>`).join("")
+    : `<li class="empty">No saved servers yet.<br>Add one on the right — it's saved after the first successful connection.<br><button class="btn small" style="margin-top:14px" data-demo>Try the demo dashboard</button></li>`;
+}
+$("#sessions").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  const s = sessions.find(x => x.id === b.closest(".sess").dataset.id); if (!s) return;
+  if (b.dataset.act === "connect") connectSaved(s);
+  else if (b.dataset.act === "edit") fillForm(s);
+  else if (b.dataset.act === "delete") {
+    const ok = await modal({ title: "Forget " + s.name + "?", text: "The saved session and any stored password for " + s.target + " will be removed from this PC.", ok: "Delete", danger: true });
+    if (ok) { await api("sessions/delete", { id: s.id }); loadSessions(); }
+  }
+});
+
+async function connectSaved(s, secret, remember) {
+  const r = await connect({ id: s.id, secret, remember }, s.name);
+  if (r.needSecret || (!r.ok && s.auth === "password" && !secret && /Authentication failed/.test(r.error || ""))) {
+    const v = await modal({
+      title: "Password for " + s.target,
+      text: r.needSecret ? "This session doesn't have a saved password." : r.error,
+      body: `<label style="display:block;font-size:12.5px;font-weight:600;color:var(--text-secondary)">Password<input type="password" name="secret" autocomplete="off"></label>
+             <label class="check" style="margin-top:10px;font-size:13px"><input type="checkbox" name="remember" checked> Remember on this PC</label>`,
+      ok: "Connect",
+    });
+    if (v && v.secret) connectSaved(s, v.secret, v.remember);
+  } else if (!r.ok) {
+    fillForm(s);
+    showFormError(r);
+  }
+}
+
+/* ---------- connection form ---------- */
+let auth = "password";
+function setAuth(a) {
+  auth = a;
+  for (const b of $$("#authSeg button")) b.setAttribute("aria-pressed", b.dataset.auth === a);
+  for (const d of $$("[data-for]")) d.hidden = d.dataset.for !== a;
+  $("#rememberRow").hidden = a === "agent";
+}
+$("#authSeg").onclick = e => { const b = e.target.closest("button"); if (b) setAuth(b.dataset.auth); };
+$("#browseBtn").onclick = async () => {
+  const r = await api("browse-key", {});
+  if (r.path) $("#connForm").keyPath.value = r.path;
+};
+function fillForm(s) {
+  const f = $("#connForm");
+  f.name.value = s.name || ""; f.host.value = s.host || ""; f.port.value = s.port || 22; f.user.value = s.user || "";
+  f.keyPath.value = s.keyPath || ""; f.password.value = ""; f.passphrase.value = "";
+  setAuth(s.auth || "password");
+  $("#formTitle").textContent = "Edit " + (s.name || "server");
+  $("#formReset").hidden = false;
+  $("#formError").hidden = true;
+  f.host.focus();
+}
+$("#formReset").onclick = () => {
+  $("#connForm").reset(); setAuth("password");
+  $("#formTitle").textContent = "Add a server"; $("#formReset").hidden = true; $("#formError").hidden = true;
+};
+function showFormError(r) {
+  const box = $("#formError");
+  box.innerHTML = esc(r.error || "Connection failed.") +
+    (r.detail ? `<details><summary>ssh output</summary><pre>${esc(r.detail)}</pre></details>` : "");
+  box.hidden = false;
+}
+$("#connForm").onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target;
+  $("#formError").hidden = true;
+  if (!f.host.value.trim()) { showFormError({ error: "Enter the server address." }); f.host.focus(); return; }
+  if (auth === "password" && !f.password.value) { showFormError({ error: "Enter the password." }); f.password.focus(); return; }
+  if (auth === "key" && !f.keyPath.value.trim()) { showFormError({ error: "Choose a private key file." }); return; }
+  const payload = {
+    name: f.name.value.trim(), host: f.host.value.trim(), port: f.port.value || "22", user: f.user.value.trim(),
+    auth, keyPath: f.keyPath.value.trim(),
+    secret: auth === "password" ? f.password.value : auth === "key" ? f.passphrase.value : "",
+    remember: f.remember.checked,
+  };
+  const r = await connect(payload, payload.name || payload.host);
+  if (!r.ok) showFormError(r);
+  else { f.password.value = ""; f.passphrase.value = ""; }
+};
+
+let connecting = false;
+async function connect(payload, label) {
+  stopDemo();
+  connecting = true;
+  resetData();
+  busy("Connecting to " + label + "…");
+  const r = await api("connect", payload);
+  busy(null);
+  connecting = false;
+  if (r.ok) {
+    enterDash(r.session, r.info);
+    loadSessions();
+  }
+  return r;
+}
+$("#busyCancel").onclick = () => api("disconnect", {});
+$("#disconnectBtn").onclick = async () => {
+  if (demoTimer) { stopDemo(); current = null; show("home"); return; }
+  await api("disconnect", {});
+};
+
+/* ---------- live events ---------- */
+let current = null;   // { session, info }
+function openEvents() {
+  const es = new EventSource("/api/events?t=" + encodeURIComponent(TOKEN));
+  es.addEventListener("status", e => onStatus(JSON.parse(e.data)));
+  es.addEventListener("info", e => { if (current) { current.info = JSON.parse(e.data); renderHeader(); } });
+  es.addEventListener("frame", e => ingest(JSON.parse(e.data)));
+}
+function onStatus(st) {
+  if (demoTimer) return;
+  const badge = $("#liveBadge"), dot = $(".dot", badge), label = $("span", badge);
+  const banner = $("#reconnectBanner");
+  if (st.state === "live") {
+    dot.className = "dot good"; label.textContent = "Live"; banner.hidden = true;
+    if (!current && st.session) enterDash(st.session, st.info);
+  } else if (st.state === "reconnecting") {
+    dot.className = "dot warning"; label.textContent = "Reconnecting";
+    banner.hidden = false; $("span", banner).textContent = st.message || "Reconnecting…";
+    if (!current && st.session) enterDash(st.session, st.info);
+  } else if (st.state === "idle" && current && !connecting) {
+    current = null;
+    show("home");
+    if (st.message) toast(st.message); else toast("Disconnected");
+  }
+}
+
+/* ---------- metrics model ---------- */
+const HIST_MAX = 900;
+const VIRTUAL_IF = /^(lo|veth|docker|br-|virbr|cni|flannel|cali|vxlan|kube|tunl|dummy)/;
+const WHOLE_DISK = /^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|hd[a-z]+|nvme\d+n\d+|mmcblk\d+)$/;
+const SKIP_FS = /^(tmpfs|devtmpfs|squashfs|overlay|efivarfs|ramfs|nsfs|tracefs)$/;
+let hist = [], prev = null, latest = null, psMap = new Map(), mounts = null, ports = null, failed = null, usersOnline = null;
+
+function resetData() { hist = []; prev = null; latest = null; psMap = new Map(); mounts = ports = failed = usersOnline = null; }
+
+function sections(text) {
+  const out = {}; let cur = null;
+  for (const line of text.split("\n")) {
+    if (/^#[a-z]+$/.test(line)) { cur = out[line.slice(1)] = []; continue; }
+    if (cur && line) cur.push(line);
+  }
+  return out;
+}
+
+function parseFrame(sec) {
+  const f = { up: parseFloat((sec.uptime?.[0] || "0").split(" ")[0]) };
+  // CPU: user nice system idle iowait irq softirq steal
+  f.cpu = []; f.ctxt = 0; f.running = 0;
+  for (const l of sec.stat || []) {
+    const p = l.trim().split(/\s+/);
+    if (p[0].startsWith("cpu")) f.cpu.push({ name: p[0], v: p.slice(1, 9).map(Number) });
+    else if (p[0] === "procs_running") f.running = +p[1];
+    else if (p[0] === "procs_blocked") f.blocked = +p[1];
+  }
+  const mem = {};
+  for (const l of sec.meminfo || []) { const m = l.match(/^(\w+):\s+(\d+)/); if (m) mem[m[1]] = +m[2] * 1024; }
+  f.mem = mem;
+  f.net = {};
+  for (const l of sec.netdev || []) {
+    const i = l.indexOf(":"); if (i < 0) continue;
+    const name = l.slice(0, i).trim(), v = l.slice(i + 1).trim().split(/\s+/).map(Number);
+    f.net[name] = { rx: v[0], tx: v[8] };
+  }
+  f.disk = {};
+  for (const l of sec.diskstats || []) {
+    const p = l.trim().split(/\s+/);
+    if (!WHOLE_DISK.test(p[2])) continue;
+    f.disk[p[2]] = { rd: +p[5] * 512, wr: +p[9] * 512, ticks: +p[12] };
+  }
+  f.load = (sec.loadavg?.[0] || "").split(" ");
+  f.sock = {};
+  for (const l of sec.sockstat || []) {
+    const [k, rest] = l.split(":"); if (!rest) continue;
+    const p = rest.trim().split(/\s+/), o = {};
+    for (let i = 0; i + 1 < p.length; i += 2) o[p[i]] = +p[i + 1];
+    f.sock[k] = o;
+  }
+  f.procs = new Map();
+  for (const l of sec.procs || []) {
+    const a = l.indexOf("("), b = l.lastIndexOf(")"); if (a < 0 || b < 0) continue;
+    const pid = +l.slice(0, a), rest = l.slice(b + 2).split(" ");
+    f.procs.set(pid, { pid, name: l.slice(a + 1, b), state: rest[0], ticks: +rest[11] + +rest[12], threads: +rest[17], rss: +rest[21] });
+  }
+  return f;
+}
+
+function cpuSplit(a, b) {
+  const d = b.map((x, i) => Math.max(0, x - (a[i] || 0)));
+  const total = d.reduce((s, x) => s + x, 0) || 1;
+  const pct = x => x / total * 100;
+  return {
+    user: pct(d[0] + d[1]), system: pct(d[2] + d[5] + d[6]), iowait: pct(d[4]), steal: pct(d[7]),
+    busy: 100 - pct(d[3] + d[4]),
+  };
+}
+
+function ingest(text, at = Date.now()) {
+  const sec = sections(text);
+  const cur = parseFrame(sec);
+  if (sec.ps) {
+    psMap = new Map();
+    for (const l of sec.ps) { const m = l.match(/^\s*(\d+)\s+(\S+)\s?(.*)$/); if (m) psMap.set(+m[1], { user: m[2], cmd: m[3] }); }
+  }
+  if (sec.df) mounts = parseDf(sec.df);
+  if (sec.users) usersOnline = +sec.users[0];
+  if (sec.listen) ports = parseListen(sec.listen);
+  if (sec.failed) failed = sec.failed.filter(Boolean);
+
+  const p = prev; prev = cur;
+  if (!p || !(cur.up > p.up)) { scheduleRender(); return; }
+  const dt = cur.up - p.up;
+  if (dt > 15) { scheduleRender(); return; } // reconnect gap: start fresh deltas
+
+  const info = current?.info || {};
+  const clk = +info.clk || 100, page = +info.page || 4096;
+  const total = cur.cpu[0] && p.cpu[0] ? cpuSplit(p.cpu[0].v, cur.cpu[0].v) : null;
+  const cores = cur.cpu.slice(1).map((c, i) => p.cpu[i + 1] ? cpuSplit(p.cpu[i + 1].v, c.v).busy : 0);
+
+  let rx = 0, tx = 0; const ifaces = [];
+  for (const [name, v] of Object.entries(cur.net)) {
+    if (name === "lo") continue;
+    const pv = p.net[name];
+    const r = pv ? Math.max(0, (v.rx - pv.rx) / dt) : 0, t = pv ? Math.max(0, (v.tx - pv.tx) / dt) : 0;
+    const virt = VIRTUAL_IF.test(name);
+    ifaces.push({ name, rx: r, tx: t, rxTotal: v.rx, txTotal: v.tx, virt });
+    if (!virt) { rx += r; tx += t; }
+  }
+  let rd = 0, wr = 0, busyMax = 0;
+  for (const [name, v] of Object.entries(cur.disk)) {
+    const pv = p.disk[name]; if (!pv) continue;
+    rd += Math.max(0, v.rd - pv.rd) / dt; wr += Math.max(0, v.wr - pv.wr) / dt;
+    busyMax = Math.max(busyMax, Math.min(100, (v.ticks - pv.ticks) / (dt * 10)));
+  }
+  const memTotal = cur.mem.MemTotal || 0;
+  const procs = [];
+  let threads = 0, zombies = 0;
+  for (const pr of cur.procs.values()) {
+    const pp = p.procs.get(pr.pid);
+    const cpu = pp ? Math.max(0, (pr.ticks - pp.ticks) / clk / dt * 100) : 0;
+    const ps = psMap.get(pr.pid);
+    threads += pr.threads || 0;
+    if (pr.state === "Z") zombies++;
+    procs.push({ pid: pr.pid, name: pr.name, state: pr.state, cpu, rss: pr.rss * page, threads: pr.threads, user: ps?.user || "", cmd: ps?.cmd || "" });
+  }
+
+  const used = Math.max(0, memTotal - (cur.mem.MemAvailable ?? cur.mem.MemFree ?? 0));
+  const cache = Math.min(memTotal - used, (cur.mem.Buffers || 0) + (cur.mem.Cached || 0) + (cur.mem.SReclaimable || 0) - (cur.mem.Shmem || 0));
+  const sample = {
+    t: at,
+    cpu: total || { user: 0, system: 0, iowait: 0, steal: 0, busy: 0 },
+    mem: { used, cache: Math.max(0, cache) },
+    net: { rx, tx },
+    disk: { read: rd, write: wr },
+  };
+  hist.push(sample);
+  if (hist.length > HIST_MAX) hist.shift();
+  latest = { sample, cores, ifaces, busyMax, procs, threads, zombies, frame: cur, memTotal };
+  scheduleRender();
+}
+
+function parseDf(lines) {
+  const seen = new Set(), out = [];
+  for (const l of lines) {
+    const p = l.trim().split(/\s+/);
+    if (p.length < 7) continue;
+    const [dev, type, size, used, avail] = p, mount = p.slice(6).join(" ");
+    if (SKIP_FS.test(type) || +size === 0 || seen.has(dev + mount)) continue;
+    if (mount.startsWith("/snap/") || mount.startsWith("/run") || mount.startsWith("/sys") || mount.startsWith("/dev")) continue;
+    seen.add(dev + mount);
+    out.push({ dev, type, mount, size: +size * 1024, used: +used * 1024, avail: +avail * 1024 });
+  }
+  return out.sort((a, b) => (a.mount === "/" ? -1 : b.mount === "/" ? 1 : a.mount.localeCompare(b.mount)));
+}
+
+function parseListen(lines) {
+  const map = new Map();
+  for (const l of lines) {
+    const p = l.trim().split(/\s+/);
+    if (p.length < 4) continue;
+    const proto = p[0].replace(/6$/, "");
+    const local = /^[A-Z-]+$/.test(p[1]) ? p[4] : p[3]; // ss vs netstat columns
+    if (!local) continue;
+    const i = local.lastIndexOf(":");
+    const addr = local.slice(0, i).replace(/%\w+$/, ""), port = +local.slice(i + 1);
+    if (!port) continue;
+    const key = proto + "/" + port;
+    if (!map.has(key)) map.set(key, { proto, port, addrs: new Set() });
+    map.get(key).addrs.add(addr === "*" || addr === "0.0.0.0" || addr === "[::]" || addr === "::" ? "all interfaces" : addr);
+  }
+  return [...map.values()].sort((a, b) => a.port - b.port || a.proto.localeCompare(b.proto));
+}
+
+/* ---------- time-series chart (canvas, with hover crosshair + tooltip) ---------- */
+let rangeSec = +store.get("range", 300);
+const charts = [];
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function niceMax(v) {
+  if (!(v > 0)) return 1;
+  const e = Math.pow(10, Math.floor(Math.log10(v))), f = v / e;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e;
+}
+function nice1024(v) { // byte axes land on 1/2/5 x KB/MB/GB
+  if (!(v > 0)) return 1024;
+  let u = 1; while (v / u >= 1024) u *= 1024;
+  return niceMax(v / u) * u;
+}
+
+class TimeChart {
+  constructor(host, o) {
+    this.o = o; this.hx = null;
+    host.classList.add("tchart");
+    host.innerHTML = `<div class="legend">${o.series.map(s => `<span class="lg"><i class="sw" style="background:var(${s.color})"></i>${esc(s.label)} <b data-k="${s.key}">–</b></span>`).join("")}</div>
+      <div class="plot"><canvas role="img" aria-label="${esc(o.title)}"></canvas><div class="tip" hidden></div></div>`;
+    this.plot = $(".plot", host); this.cv = $("canvas", host); this.tip = $(".tip", host); this.legend = $(".legend", host);
+    this.cv.addEventListener("pointermove", e => { this.hx = e.offsetX; this.draw(); });
+    this.cv.addEventListener("pointerleave", () => { this.hx = null; this.tip.hidden = true; this.draw(); });
+    new ResizeObserver(() => this.draw()).observe(this.plot);
+    charts.push(this);
+  }
+
+  draw() {
+    const o = this.o, cv = this.cv, W = this.plot.clientWidth, H = this.plot.clientHeight;
+    if (!W || !H) return;
+    const dpr = window.devicePixelRatio || 1;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    const colors = Object.fromEntries(o.series.map(s => [s.key, cssVar(s.color)]));
+    const grid = cssVar("--grid"), muted = cssVar("--text-muted"), axis = cssVar("--axis"), surface = cssVar("--surface-1");
+    const now = hist.length ? hist[hist.length - 1].t : Date.now(), t0 = now - rangeSec * 1000;
+    const pts = hist.filter(s => s.t >= t0 - 2000);
+    const vals = pts.map(o.get);
+
+    let max = o.max ? o.max() : 0;
+    if (!max) {
+      for (const v of vals) {
+        let sum = 0, m = 0;
+        for (const s of o.series) { sum += v[s.key] || 0; m = Math.max(m, v[s.key] || 0); }
+        max = Math.max(max, o.stacked ? sum : m);
+      }
+      max = (o.bytes ? nice1024 : niceMax)(Math.max(max * 1.1, o.floor || 0));
+    }
+
+    const L = 62, R = 8, T = 8, B = 22, pw = W - L - R, ph = H - T - B;
+    const X = t => L + (t - t0) / (now - t0) * pw;
+    const Y = v => T + ph - Math.min(1, Math.max(0, v / max)) * ph;
+
+    ctx.font = `11px ${cssVar("--font")}`;
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const v = max * i / 4, y = Math.round(Y(v)) + .5;
+      ctx.strokeStyle = i === 0 ? axis : grid;
+      ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
+      ctx.fillStyle = muted; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.fillText(o.fmtAxis(v), L - 8, y);
+    }
+    ctx.textBaseline = "top";
+    const marks = [[t0, "-" + (rangeSec >= 120 ? rangeSec / 60 + " min" : rangeSec + "s"), "left"], [t0 + (now - t0) / 2, "-" + (rangeSec >= 120 ? rangeSec / 120 + " min" : rangeSec / 2 + "s"), "center"], [now, "now", "right"]];
+    for (const [t, label, align] of marks) { ctx.textAlign = align; ctx.fillText(label, X(t), T + ph + 6); }
+
+    // split into segments at gaps (reconnects)
+    const segs = []; let seg = [];
+    pts.forEach((p, i) => {
+      if (seg.length && p.t - pts[seg[seg.length - 1]].t > 5000) { segs.push(seg); seg = []; }
+      seg.push(i);
+    });
+    if (seg.length) segs.push(seg);
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(L, T - 2, pw, ph + 4); ctx.clip();
+    for (const sg of segs) {
+      if (o.stacked) {
+        const base = sg.map(() => 0), edges = [];
+        o.series.forEach(s => {
+          const top = sg.map((i, k) => base[k] + (vals[i][s.key] || 0));
+          ctx.beginPath();
+          sg.forEach((i, k) => ctx.lineTo(X(pts[i].t), Y(top[k])));
+          for (let k = sg.length - 1; k >= 0; k--) ctx.lineTo(X(pts[sg[k]].t), Y(base[k]));
+          ctx.closePath();
+          ctx.globalAlpha = .85; ctx.fillStyle = colors[s.key]; ctx.fill(); ctx.globalAlpha = 1;
+          edges.push(top);
+          sg.forEach((_, k) => base[k] = top[k]);
+        });
+        // thin surface gap between bands
+        ctx.strokeStyle = surface; ctx.lineWidth = 1; ctx.lineJoin = "round";
+        edges.slice(0, -1).forEach(top => {
+          ctx.beginPath(); sg.forEach((i, k) => ctx.lineTo(X(pts[i].t), Y(top[k]))); ctx.stroke();
+        });
+      } else {
+        o.series.forEach(s => {
+          ctx.beginPath();
+          sg.forEach(i => ctx.lineTo(X(pts[i].t), Y(vals[i][s.key] || 0)));
+          ctx.strokeStyle = colors[s.key]; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke();
+          ctx.lineTo(X(pts[sg[sg.length - 1]].t), Y(0)); ctx.lineTo(X(pts[sg[0]].t), Y(0)); ctx.closePath();
+          ctx.globalAlpha = .08; ctx.fillStyle = colors[s.key]; ctx.fill(); ctx.globalAlpha = 1;
+        });
+      }
+    }
+    ctx.restore();
+
+    // legend: latest values
+    const last = vals[vals.length - 1];
+    for (const b of $$("b[data-k]", this.legend)) b.textContent = last ? o.fmt(last[b.dataset.k] || 0) : "–";
+
+    // hover
+    if (this.hx == null || !pts.length || this.hx < L) { this.tip.hidden = true; return; }
+    let best = 0, bd = Infinity;
+    pts.forEach((p, i) => { const d = Math.abs(X(p.t) - this.hx); if (d < bd) { bd = d; best = i; } });
+    const x = Math.round(X(pts[best].t)) + .5, v = vals[best];
+    ctx.strokeStyle = axis; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + ph); ctx.stroke();
+    let acc = 0;
+    for (const s of o.series) {
+      const yv = o.stacked ? (acc += v[s.key] || 0) : v[s.key] || 0;
+      ctx.beginPath(); ctx.arc(x, Y(yv), 4, 0, Math.PI * 2);
+      ctx.fillStyle = colors[s.key]; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = surface; ctx.stroke();
+    }
+    const rows = [...o.series].reverse().map(s => `<div class="tr"><i class="sw" style="background:var(${s.color})"></i><span>${esc(s.label)}</span><b>${o.fmt(v[s.key] || 0)}</b></div>`);
+    if (o.total) rows.push(`<div class="tr total"><span>${esc(o.total)}</span><b>${o.fmt(o.series.reduce((a, s) => a + (v[s.key] || 0), 0))}</b></div>`);
+    this.tip.innerHTML = `<div class="tt">${new Date(pts[best].t).toLocaleTimeString()} · ${ago(now - pts[best].t)}</div>${rows.join("")}`;
+    this.tip.hidden = false;
+    const tw = this.tip.offsetWidth;
+    this.tip.style.left = (x + 14 + tw > W ? x - 14 - tw : x + 14) + "px";
+  }
+}
+
+const cpuChart = new TimeChart($("#cpuChart"), {
+  title: "CPU usage over time", stacked: true, max: () => 100, total: "Total",
+  series: [
+    { key: "user", label: "User", color: "--series-1" },
+    { key: "system", label: "System", color: "--series-2" },
+    { key: "iowait", label: "I/O wait", color: "--series-3" },
+    { key: "steal", label: "Steal", color: "--series-4" },
+  ],
+  get: s => s.cpu, fmt: v => v.toFixed(1) + "%", fmtAxis: v => v.toFixed(0) + "%",
+});
+const memChart = new TimeChart($("#memChart"), {
+  title: "Memory over time", stacked: true, bytes: true, max: () => latest?.memTotal || 0, total: "Total",
+  series: [
+    { key: "used", label: "Used by apps", color: "--series-1" },
+    { key: "cache", label: "Cache / buffers", color: "--series-2" },
+  ],
+  get: s => s.mem, fmt: v => fmtBytes(v), fmtAxis: v => fmtBytes(v, v ? undefined : 0),
+});
+const netChart = new TimeChart($("#netChart"), {
+  title: "Network throughput", bytes: true, floor: 10240,
+  series: [
+    { key: "rx", label: "Download", color: "--series-1" },
+    { key: "tx", label: "Upload", color: "--series-2" },
+  ],
+  get: s => s.net, fmt: fmtRate, fmtAxis: v => fmtBytes(v, v ? undefined : 0) + "/s",
+});
+const diskChart = new TimeChart($("#diskChart"), {
+  title: "Disk read and write", bytes: true, floor: 10240,
+  series: [
+    { key: "read", label: "Read", color: "--series-1" },
+    { key: "write", label: "Write", color: "--series-2" },
+  ],
+  get: s => s.disk, fmt: fmtRate, fmtAxis: v => fmtBytes(v, v ? undefined : 0) + "/s",
+});
+function redrawCharts() { for (const c of charts) c.draw(); }
+
+function setRange(r) {
+  rangeSec = r; store.set("range", r);
+  for (const b of $$("#rangeSeg button")) b.setAttribute("aria-pressed", +b.dataset.range === r);
+  redrawCharts();
+}
+$("#rangeSeg").onclick = e => { const b = e.target.closest("button"); if (b) setRange(+b.dataset.range); };
+
+/* ---------- dashboard rendering ---------- */
+function enterDash(session, info) {
+  current = { session, info: info || {} };
+  renderHeader();
+  show("dash");
+}
+function renderHeader() {
+  if (!current) return;
+  const { session: s, info: i } = current;
+  $("#dHost").textContent = s.name || i.hostname || s.host;
+  const bits = [i.hostname && i.hostname !== s.name ? i.hostname : null, i.os, i.kernel, i.cores ? i.cores + " vCPU" + (i.cpu ? " · " + i.cpu : "") : null, i.virt && i.virt !== "none" ? i.virt : null].filter(Boolean);
+  $("#dSub").textContent = bits.join(" · ");
+  $("#topInfo").innerHTML = `<b>${esc(i.user || s.user || "")}@${esc(s.host)}</b>${s.port !== 22 ? ":" + s.port : ""}`;
+  $("#coreCount").textContent = i.cores ? i.cores + " cores" : "";
+}
+
+let renderQueued = false;
+function scheduleRender() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; if (!$("#view-dash").hidden) render(); });
+}
+
+const KPI_IDS = ["cpu", "mem", "swap", "load", "net", "disk", "root", "procs", "conn", "uptime"];
+$("#kpis").innerHTML = KPI_IDS.map(id => `<div class="card kpi" id="k-${id}"><div class="k-label"><span></span><span class="k-status"></span></div><div class="k-value num">–</div><div class="k-sub"></div><div class="meter" hidden><i></i></div></div>`).join("");
+function kpi(id, label, value, sub, meterPct, lv, statusLabels) {
+  const el = $("#k-" + id);
+  $(".k-label span", el).textContent = label;
+  $(".k-status", el).innerHTML = statusTag(lv, statusLabels);
+  $(".k-value", el).innerHTML = value;
+  $(".k-sub", el).textContent = sub;
+  const m = $(".meter", el);
+  m.hidden = meterPct == null;
+  if (meterPct != null) { const i = $("i", m); i.style.width = Math.min(100, Math.max(0, meterPct)) + "%"; i.className = lv || ""; }
+}
+
+let sortKey = "cpu", sortDir = -1;
+$("#procTable thead").onclick = e => {
+  const b = e.target.closest("button[data-sort]"); if (!b) return;
+  const k = b.dataset.sort;
+  if (k === sortKey) sortDir = -sortDir; else { sortKey = k; sortDir = ["name", "user", "state"].includes(k) ? 1 : -1; }
+  for (const x of $$("#procTable button[data-sort]")) x.removeAttribute("aria-sort");
+  b.setAttribute("aria-sort", sortDir > 0 ? "ascending" : "descending");
+  render();
+};
+$("#procSearch").oninput = () => render();
+
+const STATE_LABEL = { R: "running", S: "sleeping", D: "disk wait", Z: "zombie", T: "stopped", I: "idle", t: "traced" };
+
+function render() {
+  redrawCharts();
+  if (!latest) return;
+  const L = latest, s = L.sample, f = L.frame, info = current?.info || {};
+  const cores = +info.cores || L.cores.length || 1;
+
+  const cpuLv = level(s.cpu.busy, 75, 90);
+  kpi("cpu", "CPU", fmtPct(s.cpu.busy), `${cores} vCPU · steal ${fmtPct(s.cpu.steal, 1)} · iowait ${fmtPct(s.cpu.iowait, 1)}`, s.cpu.busy, cpuLv);
+  $("#cpuNow").textContent = fmtPct(s.cpu.busy) + " busy";
+
+  const memPct = L.memTotal ? s.mem.used / L.memTotal * 100 : 0, memLv = level(memPct, 80, 92);
+  kpi("mem", "Memory", `${fmtBytes(s.mem.used)} <small>/ ${fmtBytes(L.memTotal)}</small>`, `${fmtPct(memPct)} used · ${fmtBytes(s.mem.cache)} cache`, memPct, memLv);
+  $("#memNow").textContent = fmtPct(memPct) + " used";
+
+  const swT = f.mem.SwapTotal || 0, swU = swT - (f.mem.SwapFree || 0), swPct = swT ? swU / swT * 100 : 0;
+  kpi("swap", "Swap", swT ? `${fmtBytes(swU)} <small>/ ${fmtBytes(swT)}</small>` : `<small>No swap</small>`, swT ? fmtPct(swPct) + " used" : "No swap configured", swT ? swPct : null, swT ? level(swPct, 50, 80) : "");
+
+  const l1 = +f.load[0] || 0, perCore = l1 / cores, loadLv = perCore >= 1.5 ? "critical" : perCore >= 1 ? "warning" : "";
+  kpi("load", "Load average", `${f.load[0] || "–"} <small>${f.load[1] || ""} ${f.load[2] || ""}</small>`, `1 / 5 / 15 min · ${perCore.toFixed(2)} per core`, Math.min(100, perCore * 100), loadLv, { warning: "Saturated", critical: "Overloaded" });
+
+  const netTotal = L.ifaces.filter(i => !i.virt).reduce((a, i) => ({ rx: a.rx + i.rxTotal, tx: a.tx + i.txTotal }), { rx: 0, tx: 0 });
+  kpi("net", "Network", `↓ ${fmtRate(s.net.rx)}`, `↑ ${fmtRate(s.net.tx)} · ${fmtBytes(netTotal.rx)} in / ${fmtBytes(netTotal.tx)} out`, null, "");
+
+  kpi("disk", "Disk I/O", `${fmtRate(s.disk.read + s.disk.write)}`, `read ${fmtRate(s.disk.read)} · write ${fmtRate(s.disk.write)} · busy ${fmtPct(L.busyMax)}`, null, level(L.busyMax, 70, 90), { warning: "Busy", critical: "Saturated" });
+  $("#diskBusy").textContent = "busiest disk " + fmtPct(L.busyMax) + " utilised";
+
+  const root = mounts?.find(m => m.mount === "/") || mounts?.[0];
+  if (root) {
+    const pct = root.used / (root.used + root.avail) * 100, lv = level(pct, 80, 90);
+    kpi("root", "Disk " + root.mount, fmtPct(pct), `${fmtBytes(root.avail)} free of ${fmtBytes(root.size)}`, pct, lv, { warning: "Filling up", critical: "Almost full" });
+  } else kpi("root", "Disk", "–", "Waiting for data…", null, "");
+
+  kpi("procs", "Processes", `${L.procs.length}`, `${f.running || 0} running · ${L.threads} threads${L.zombies ? " · " + L.zombies + " zombie" : ""}`, null, L.zombies > 5 ? "warning" : "", { warning: "Zombies", critical: "Zombies" });
+
+  const tcp = f.sock.TCP || {};
+  kpi("conn", "TCP sockets", `${tcp.inuse ?? "–"}`, `${tcp.tw ?? 0} time-wait · ${tcp.orphan ?? 0} orphan${usersOnline != null ? " · " + usersOnline + " logged in" : ""}`, null, "");
+
+  kpi("uptime", "Uptime", fmtDuration(f.up), "since " + new Date(Date.now() - f.up * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }), null, "");
+
+  // per-core
+  $("#cores").innerHTML = L.cores.map((c, i) => {
+    const lv = level(c, 75, 90);
+    return `<div class="core"><div class="top"><span>Core ${i}</span><b>${fmtPct(c)}</b></div><div class="meter"><i class="${lv}" style="width:${Math.min(100, c)}%"></i></div></div>`;
+  }).join("");
+
+  $("#topProcs").innerHTML = [...L.procs].sort((a, b) => b.cpu - a.cpu).slice(0, 6).map(p =>
+    `<li><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)} <span class="muted">${p.pid}</span></span><b class="num">${p.cpu.toFixed(1)}%</b></li>`).join("");
+
+  // storage
+  if (mounts) {
+    $("#mounts").innerHTML = mounts.length ? mounts.map(m => {
+      const pct = m.used / ((m.used + m.avail) || 1) * 100, lv = level(pct, 80, 90);
+      return `<div class="mount"><div class="top"><span title="${esc(m.dev)}"><b>${esc(m.mount)}</b> <span class="pill">${esc(m.type)}</span></span><span class="num">${fmtPct(pct)} ${statusTag(lv, { warning: "Filling up", critical: "Almost full" })}</span></div>
+        <div class="meter"><i class="${lv}" style="width:${pct}%"></i></div>
+        <div class="sub num"><span>${fmtBytes(m.used)} used</span><span>${fmtBytes(m.avail)} free of ${fmtBytes(m.size)}</span></div></div>`;
+    }).join("") : `<span class="muted">No mounted filesystems reported.</span>`;
+  }
+
+  // processes
+  const q = $("#procSearch").value.trim().toLowerCase();
+  let rows = L.procs;
+  if (q) rows = rows.filter(p => (p.name + " " + p.user + " " + p.cmd + " " + p.pid).toLowerCase().includes(q));
+  rows = [...rows].sort((a, b) => {
+    const x = a[sortKey], y = b[sortKey];
+    return (typeof x === "string" ? x.localeCompare(y) : x - y) * sortDir || b.cpu - a.cpu;
+  }).slice(0, 80);
+  $("#procSummary").textContent = `${L.procs.length} processes${q ? " · " + rows.length + " shown" : ""}`;
+  $("#procTable tbody").innerHTML = rows.map(p => `<tr>
+    <td class="r num">${p.pid}</td><td>${esc(p.name)}</td><td>${esc(p.user)}</td>
+    <td class="r num">${p.cpu.toFixed(1)}%</td>
+    <td class="r num">${fmtBytes(p.rss)} <span class="muted">${L.memTotal ? (p.rss / L.memTotal * 100).toFixed(1) + "%" : ""}</span></td>
+    <td class="r num">${p.threads}</td><td>${STATE_LABEL[p.state] || esc(p.state)}</td>
+    <td class="cmd" title="${esc(p.cmd)}">${esc(p.cmd)}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">No matching processes.</td></tr>`;
+
+  // interfaces
+  $("#ifTable tbody").innerHTML = [...L.ifaces].sort((a, b) => a.virt - b.virt || (b.rxTotal + b.txTotal) - (a.rxTotal + a.txTotal)).slice(0, 14).map(i => `
+    <tr class="${i.virt ? "virt" : ""}"><td>${esc(i.name)}${i.virt ? ' <span class="pill">virtual</span>' : ""}</td>
+    <td class="r num">${fmtRate(i.rx)}</td><td class="r num">${fmtRate(i.tx)}</td>
+    <td class="r num">${fmtBytes(i.rxTotal)}</td><td class="r num">${fmtBytes(i.txTotal)}</td></tr>`).join("");
+
+  // ports
+  if (ports) {
+    $("#portCount").textContent = ports.length + " open";
+    $("#ports").innerHTML = ports.length ? ports.map(p => `<li><span><b class="num">${p.port}</b> <span class="pill">${esc(p.proto)}</span></span><span class="muted" style="text-align:right">${esc([...p.addrs].join(", "))}</span></li>`).join("")
+      : `<li class="muted">No listening sockets reported.</li>`;
+  }
+
+  // services
+  if (failed) {
+    $("#services").innerHTML = failed.length
+      ? `<div class="ok-line" style="margin-bottom:8px"><i class="dot critical"></i><b style="color:var(--text-primary)">${failed.length} failed unit${failed.length > 1 ? "s" : ""}</b></div><ul class="list">${failed.map(u => `<li><span>${esc(u)}</span></li>`).join("")}</ul>`
+      : `<div class="ok-line"><i class="dot good"></i>No failed systemd units</div>`;
+  }
+}
+
+/* ---------- demo mode: a simulated server (for trying the UI and for screenshots) ---------- */
+const DEMO_INFO = { hostname: "web-prod-01", kernel: "Linux 6.8.0-45-generic", arch: "x86_64", os: "Ubuntu 24.04.1 LTS", cores: "4", cpu: "AMD EPYC 7763 64-Core Processor", clk: "100", page: "4096", user: "deploy", virt: "kvm" };
+const DEMO_SESSION = { id: "demo", name: "production-api", host: "203.0.113.24", port: 22, user: "deploy", auth: "key", target: "deploy@203.0.113.24" };
+const DEMO_PROCS = [
+  // pid, name, user, command, share of busy CPU, RSS MB, threads
+  [1, "systemd", "root", "/sbin/init", .002, 13, 1],
+  [612, "systemd-journal", "root", "/usr/lib/systemd/systemd-journald", .004, 48, 1],
+  [701, "sshd", "root", "sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups", .001, 9, 1],
+  [742, "dockerd", "root", "/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock", .03, 96, 21],
+  [755, "containerd", "root", "/usr/bin/containerd", .02, 52, 14],
+  [811, "nginx", "root", "nginx: master process /usr/sbin/nginx -g daemon on; master_process on;", .002, 11, 1],
+  [812, "nginx", "www-data", "nginx: worker process", .09, 24, 1],
+  [813, "nginx", "www-data", "nginx: worker process", .08, 23, 1],
+  [920, "postgres", "postgres", "/usr/lib/postgresql/16/bin/postgres -D /var/lib/postgresql/16/main", .05, 210, 1],
+  [944, "postgres", "postgres", "postgres: 16/main: checkpointer", .01, 64, 1],
+  [951, "postgres", "postgres", "postgres: 16/main: app api 172.18.0.4(50122) idle", .12, 142, 1],
+  [1022, "redis-server", "redis", "/usr/bin/redis-server 127.0.0.1:6379", .03, 38, 6],
+  [1180, "node", "deploy", "node /srv/api/dist/server.js --port 3000", .34, 412, 11],
+  [1181, "node", "deploy", "node /srv/api/dist/worker.js --queue emails", .11, 236, 11],
+  [1240, "node", "deploy", "node /srv/web/.next/standalone/server.js", .14, 318, 11],
+  [1302, "fail2ban-server", "root", "/usr/bin/python3 /usr/bin/fail2ban-server -xf start", .004, 41, 4],
+  [1377, "cron", "root", "/usr/sbin/cron -f", 0, 3, 1],
+  [2201, "sshd", "deploy", "sshd: deploy@notty", .006, 8, 1],
+  [2219, "sh", "deploy", "sh", .004, 2, 1],
+];
+
+// Produces frames in exactly the format remote.sh prints, so the real parsing path is exercised.
+class DemoServer {
+  constructor() {
+    this.t = 0; this.up = 1386420.37;
+    this.cpu = Array.from({ length: 5 }, () => [52e5, 3e4, 9e5, 95e6, 4e4, 0, 2e4, 6e3]);
+    this.net = { eth0: [482.3e9, 131.7e9], docker0: [2.1e9, 3.4e9], veth3f9a1c2: [1.2e9, 0.9e9] };
+    this.disk = [1.8e6, 8.2e6, 8.1e7]; // sectors read, sectors written, io ms
+    this.ticks = new Map(DEMO_PROCS.map(p => [p[0], 4e4 * p[4] + 50]));
+    this.load = [0.82, 0.74, 0.69];
+  }
+  wave(period, amp) { return Math.sin(this.t / period * Math.PI * 2) * amp; }
+  frame() {
+    const t = ++this.t, rnd = Math.random;
+    this.up += 1;
+    // a traffic burst every 3 minutes drives CPU, network and disk together
+    const burst = (t % 180) > 150 ? 1 : 0;
+    const busy = Math.min(.95, .16 + this.wave(97, .06) + burst * .38 + rnd() * .07);
+    let busyTicks = 0;
+    for (let c = 1; c <= 4; c++) {
+      const b = Math.min(.98, Math.max(.02, busy + (rnd() - .5) * .16 + (c === 1 ? .05 : 0)));
+      const io = .004 + burst * .012 * rnd(), steal = .002 + rnd() * .004;
+      const d = [b * 66, b * 2, b * 24, (1 - b - io - steal) * 100, io * 100, b * 2, b * 6, steal * 100].map(x => Math.max(0, Math.round(x)));
+      d.forEach((x, i) => { this.cpu[c][i] += x; this.cpu[0][i] += x; });
+      busyTicks += b * 100;
+    }
+    const l = busy * 4 + .1;
+    this.load = [this.load[0] + (l - this.load[0]) * .08, this.load[1] + (l - this.load[1]) * .017, this.load[2] + (l - this.load[2]) * .006];
+    const rx = 1.1e6 + this.wave(61, 3e5) + burst * 4.2e6 + rnd() * 2e5, tx = 2.4e6 + this.wave(61, 6e5) + burst * 9.5e6 + rnd() * 4e5;
+    this.net.eth0[0] += rx; this.net.eth0[1] += tx;
+    this.net.docker0[0] += rx * .2; this.net.docker0[1] += tx * .25;
+    this.net.veth3f9a1c2[0] += rx * .2; this.net.veth3f9a1c2[1] += tx * .25;
+    const rd = 1.5e5 + burst * 1.8e6 * rnd() + rnd() * 5e4, wr = 9e5 + this.wave(43, 4e5) + burst * 3.5e6 + (t % 30 === 0 ? 6e6 : 0);
+    this.disk[0] += rd / 512; this.disk[1] += wr / 512; this.disk[2] += 30 + burst * 160 + rnd() * 40;
+    for (const p of DEMO_PROCS) this.ticks.set(p[0], this.ticks.get(p[0]) + busyTicks * p[4] * (.7 + rnd() * .6));
+
+    const total = 8152948 * 1024, used = 3.32e9 + this.wave(240, 1.6e8) + burst * 3.2e8, cached = 3.41e9;
+    const kb = x => Math.round(x / 1024), swap = 2 * 1024 ** 3;
+    const L = [];
+    L.push("#uptime", `${this.up.toFixed(2)} ${(this.up * 3.1).toFixed(2)}`);
+    L.push("#loadavg", `${this.load.map(x => x.toFixed(2)).join(" ")} 3/412 2391`);
+    L.push("#stat", ...this.cpu.map((v, i) => `cpu${i ? i - 1 : ""} ${v.join(" ")} 0 0`), `ctxt ${9e8 + t * 4100}`, `procs_running ${1 + Math.round(busy * 5)}`, "procs_blocked 0");
+    L.push("#meminfo", `MemTotal: ${kb(total)} kB`, `MemFree: ${kb(total - used - cached)} kB`, `MemAvailable: ${kb(total - used)} kB`, `Buffers: ${kb(1.9e8)} kB`,
+      `Cached: ${kb(cached - 1.9e8)} kB`, `SReclaimable: ${kb(2.6e8)} kB`, `Shmem: ${kb(4.1e7)} kB`, `SwapTotal: ${kb(swap)} kB`, `SwapFree: ${kb(swap - 1.26e8)} kB`, "Dirty: 412 kB");
+    L.push("#netdev", `lo: ${8.1e9 + t * 2e4} 0 0 0 0 0 0 0 ${8.1e9 + t * 2e4} 0 0 0 0 0 0 0`,
+      ...Object.entries(this.net).map(([n, [r, x]]) => `${n}: ${Math.round(r)} 0 0 0 0 0 0 0 ${Math.round(x)} 0 0 0 0 0 0 0`));
+    L.push("#diskstats", `252 0 vda 912455 0 ${Math.round(this.disk[0])} 0 4120330 0 ${Math.round(this.disk[1])} 0 0 ${Math.round(this.disk[2])} 0`,
+      `252 1 vda1 900000 0 ${Math.round(this.disk[0])} 0 4100000 0 ${Math.round(this.disk[1])} 0 0 ${Math.round(this.disk[2])} 0`);
+    L.push("#sockstat", "sockets: used 512", `TCP: inuse ${118 + Math.round(burst * 160 + rnd() * 12)} orphan 0 tw ${34 + Math.round(burst * 90)} alloc 190 mem 24`, "UDP: inuse 4 mem 2");
+    L.push("#procs");
+    for (const [pid, name, , , , rss, th] of DEMO_PROCS) {
+      const tk = Math.round(this.ticks.get(pid));
+      L.push(`${pid} (${name}) ${name === "node" && rnd() < .3 ? "R" : "S"} 1 ${pid} ${pid} 0 -1 4194560 0 0 0 0 ${Math.round(tk * .8)} ${Math.round(tk * .2)} 0 0 20 0 ${th} 0 100 0 ${Math.round(rss * 256 * (1 + this.wave(300, .03)))}`);
+    }
+    for (let i = 0; i < 158; i++) L.push(`${2 + i} (kworker/${i % 4}:${i % 3}) I 2 0 0 0 -1 69238880 0 0 0 0 0 ${i % 7} 0 0 20 0 1 0 100 0 0`);
+    L.push("#ps", ...DEMO_PROCS.map(p => `${String(p[0]).padStart(7)} ${p[2]} ${p[3]}`));
+    L.push("#df", "/dev/vda1 ext4 81106868 27341224 53749260 34% /", "/dev/vda15 vfat 106832 6250 100582 6% /boot/efi",
+      "/dev/vdb1 ext4 206292664 125838524 70002708 65% /var/lib/postgresql", "tmpfs tmpfs 815296 1060 814236 1% /run");
+    L.push("#users", "1");
+    L.push("#listen", "udp UNCONN 0 0 127.0.0.53%lo:53 0.0.0.0:*", "tcp LISTEN 0 4096 0.0.0.0:22 0.0.0.0:*", "tcp LISTEN 0 4096 [::]:22 [::]:*",
+      "tcp LISTEN 0 511 0.0.0.0:80 0.0.0.0:*", "tcp LISTEN 0 511 0.0.0.0:443 0.0.0.0:*", "tcp LISTEN 0 511 127.0.0.1:3000 0.0.0.0:*",
+      "tcp LISTEN 0 511 127.0.0.1:3001 0.0.0.0:*", "tcp LISTEN 0 244 127.0.0.1:5432 0.0.0.0:*", "tcp LISTEN 0 511 127.0.0.1:6379 0.0.0.0:*");
+    L.push("#failed");
+    return L.join("\n");
+  }
+}
+
+let demoTimer = null;
+function startDemo() {
+  stopDemo();
+  resetData();
+  enterDash(DEMO_SESSION, DEMO_INFO);
+  const d = new DemoServer(), now = Date.now();
+  for (let i = 600; i > 0; i--) ingest(d.frame(), now - i * 1000);
+  demoTimer = setInterval(() => ingest(d.frame()), 1000);
+  const badge = $("#liveBadge");
+  $(".dot", badge).className = "dot good";
+  $("span", badge).textContent = "Demo data";
+  $("#reconnectBanner").hidden = true;
+}
+function stopDemo() { clearInterval(demoTimer); demoTimer = null; }
+document.addEventListener("click", e => {
+  if (!e.target.closest("[data-demo]")) return;
+  e.preventDefault();
+  startDemo();
+});
+
+/* ---------- start ---------- */
+(async function boot() {
+  const params = new URLSearchParams(location.search);
+  applyTheme(params.get("theme") || store.get("theme", "system"));
+  setRange(+params.get("range") || rangeSec);
+  setAuth("password");
+  if (params.has("demo")) { startDemo(); return; } // e.g. open ui.html?demo directly in a browser
+  if (!(await checkEnv())) return;
+  await loadSessions();
+  openEvents();
+  const st = await api("state");
+  if (st.session && (st.state === "live" || st.state === "reconnecting")) enterDash(st.session, st.info);
+  else show("home");
+})();
+</script>
+</body>
+</html>

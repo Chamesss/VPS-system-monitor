@@ -1,0 +1,50 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version from tag
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like "refs/tags/v*") { $v = $env:GITHUB_REF_NAME.Substring(1) }
+          else { $v = ([xml](Get-Content src/VPSMonitor.csproj)).Project.PropertyGroup.Version | Select-Object -First 1 }
+          "VERSION=$v" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: Build
+        shell: pwsh
+        run: ./build.ps1 -Version $env:VERSION
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VPSMonitor-${{ env.VERSION }}
+          path: |
+            dist/VPSMonitor.exe
+            dist/VPSMonitor.exe.sha256
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: VPS Monitor ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            **Download `VPSMonitor.exe` below and run it.** No installer, nothing to install on your server.
+
+            Requires Windows 10 (1903+) or 11. Windows SmartScreen may warn because the exe is not code-signed: click *More info → Run anyway*.
+            Verify the download with the `.sha256` file: `Get-FileHash VPSMonitor.exe`.
+          files: |
+            dist/VPSMonitor.exe
+            dist/VPSMonitor.exe.sha256
